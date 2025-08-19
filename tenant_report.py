@@ -84,7 +84,13 @@ else:
             with col1:
                 st.write(product_name)
             with col2:
-                st.write(f"Rp {product_price:}")
+                manual_price = st.number_input(
+                    "Harga Satuan", 
+                    min_value=0, 
+                    value=[product_price], 
+                    key=f"price_{product_name.replace(' ', '_')}",
+                    label_visibility="collapsed" # Menyembunyikan label "Harga Satuan"
+                )
             with col3:
                 # Kotak input jumlah untuk setiap produk
                 quantity = st.number_input("Jumlah", min_value=0, step=1, key=f"qty_{product_name.replace(' ', '_')}")
@@ -100,7 +106,7 @@ else:
                     selected_tenant,
                     product_name,
                     quantity,
-                    product_price,
+                    manual_price,
                     subtotal,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ])
