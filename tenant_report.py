@@ -24,9 +24,7 @@ def load_master_data():
         worksheet = gsheet.worksheet(st.secrets["master_sheet_name"])
         records = worksheet.get_all_records()
         df = pd.DataFrame(records)
-        df['Harga_Jual'] = pd.to_numeric(df['Harga_Jual'], errors='coerce').fillna(0)
         return df
-    
     except Exception as e:
         st.error(f"Gagal memuat data master: {e}")
         return pd.DataFrame() # Mengembalikan DataFrame kosong jika gagal
@@ -86,13 +84,7 @@ else:
             with col1:
                 st.write(product_name)
             with col2:
-                manual_price = st.number_input(
-                    "Harga Satuan", 
-                    min_value=0, 
-                    value=int(product_price), # Pastikan tipenya integer
-                    key=f"price_{product_name.replace(' ', '_')}",
-                    label_visibility="collapsed" # Menyembunyikan label
-                )
+                st.write(f"Rp {product_price:}")
             with col3:
                 # Kotak input jumlah untuk setiap produk
                 quantity = st.number_input("Jumlah", min_value=0, step=1, key=f"qty_{product_name.replace(' ', '_')}")
@@ -108,7 +100,7 @@ else:
                     selected_tenant,
                     product_name,
                     quantity,
-                    manual_price,
+                    product_price,
                     subtotal,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ])
