@@ -11,8 +11,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Menggunakan cache agar data master tidak di-load ulang setiap kali ada interaksi
-@st.cache_data(ttl=600) # Cache data selama 10 menit
+@st.cache_data(ttl=600)
 def load_master_data():
     """Memuat data master produk dari Google Sheets dan mengembalikannya sebagai DataFrame."""
     try:
@@ -27,7 +26,7 @@ def load_master_data():
         return df
     except Exception as e:
         st.error(f"Gagal memuat data master: {e}")
-        return pd.DataFrame() # Mengembalikan DataFrame kosong jika gagal
+        return pd.DataFrame()
 
 def submit_sales_log(sales_data):
     """Mengirim data log penjualan (bisa beberapa baris) ke Google Sheets."""
@@ -38,10 +37,7 @@ def submit_sales_log(sales_data):
         client = gspread.authorize(creds)
         gsheet = client.open(st.secrets["gsheet_name"])
         worksheet = gsheet.worksheet(st.secrets["log_sheet_name"])
-        
-        # append_rows lebih efisien untuk banyak baris
         worksheet.append_rows(sales_data, value_input_option='USER_ENTERED')
-        
         return True, "Transaksi berhasil disimpan!"
     except Exception as e:
         return False, f"Gagal menyimpan transaksi: {e}"
@@ -51,71 +47,85 @@ def submit_sales_log(sales_data):
 st.set_page_config(layout="wide", page_title="Aplikasi Kasir")
 st.title("🛒 Aplikasi Kasir Penjualan Tenant")
 
-# Memuat data master
 master_df = load_master_data()
 
 if master_df.empty:
     st.error("Data produk tidak dapat dimuat. Periksa koneksi atau konfigurasi secrets.")
 else:
-    # --- UI APLIKASI ---
-    
-    # 1. Pilih Tenant
-    list_tenant = master_df['Tenant'].unique().tolist()
+    list_tenant = master_df['nama_tenant'].unique().tolist()
     selected_tenant = st.selectbox("Pilih Tenant:", list_tenant, index=None, placeholder="--Pilih nama tenant--")
 
-    # Hanya tampilkan daftar produk jika tenant sudah dipilih
     if selected_tenant:
         st.markdown(f"### Menu untuk: **{selected_tenant}**")
         
-        # Filter produk untuk tenant yang dipilih
-        products_df = master_df[master_df['Tenant'] == selected_tenant]
-
-        # Inisialisasi keranjang belanja dan total
+        products_df = master_df[master_df['nama_tenant'] == selected_tenant]
         transaction_cart = []
         grand_total = 0
 
-        # 2. Masukkan Jumlah Produk
+        # Membuat header tabel manual
+        col1, col2, col3, col4 = st.columns([3, 2, 1, 2])
+        with col1:
+            st.markdown("**Produk**")
+        with col2:
+            st.markdown("**Harga Satuan (Rp)**")
+        with col3:
+            st.markdown("**Jumlah**")
+        with col4:
+            st.markdown("**Subtotal (Rp)**")
+        st.divider()
+
         for index, row in products_df.iterrows():
-            product_name = row['Produk']
-            product_price = row['Harga_Jual']
+            product_name = row['nama_produk']
+            # Harga dari GSheet sekarang menjadi harga default
+            default_price = row['harga_jual']
             
             col1, col2, col3, col4 = st.columns([3, 2, 1, 2])
             
             with col1:
                 st.write(product_name)
+
+            # --- PERUBAHAN DI SINI ---
             with col2:
+                # Mengganti teks statis dengan input angka yang bisa diedit
+                # Nilai defaultnya adalah harga dari Google Sheet
                 manual_price = st.number_input(
                     "Harga Satuan", 
                     min_value=0, 
-                    value=[product_price], 
+                    value=default_price, 
                     key=f"price_{product_name.replace(' ', '_')}",
                     label_visibility="collapsed" # Menyembunyikan label "Harga Satuan"
                 )
-            with col3:
-                # Kotak input jumlah untuk setiap produk
-                quantity = st.number_input("Jumlah", min_value=0, step=1, key=f"qty_{product_name.replace(' ', '_')}")
             
-            subtotal = quantity * product_price
+            with col3:
+                quantity = st.number_input(
+                    "Jumlah", 
+                    min_value=0, 
+                    step=1, 
+                    key=f"qty_{product_name.replace(' ', '_')}",
+                    label_visibility="collapsed"
+                )
+            
+            # Subtotal sekarang dihitung dari harga manual
+            subtotal = quantity * manual_price
             with col4:
-                st.write(f"Rp {subtotal:}")
+                st.write(f"**{subtotal:,}**")
+            # --- AKHIR PERUBAHAN ---
 
-            # Jika jumlah lebih dari 0, tambahkan ke keranjang
             if quantity > 0:
                 grand_total += subtotal
+                # Menyimpan harga manual ke dalam log
                 transaction_cart.append([
                     selected_tenant,
                     product_name,
                     quantity,
-                    manual_price,
+                    manual_price, # <-- Menggunakan harga manual
                     subtotal,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ])
         
-        st.markdown("---")
-        # 3. Tampilkan Total Harga Otomatis
+        st.divider()
         st.markdown(f"## Total Belanja: Rp {grand_total:,}")
         
-        # 4. Tombol Submit
         if st.button("Simpan Transaksi", type="primary"):
             if not transaction_cart:
                 st.warning("Keranjang masih kosong. Mohon masukkan jumlah produk yang dibeli.")
