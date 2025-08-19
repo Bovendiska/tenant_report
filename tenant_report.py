@@ -31,6 +31,7 @@ def load_master_data():
         # Mengambil semua data dan mengubahnya menjadi DataFrame Pandas
         records = worksheet.get_all_records()
         df = pd.DataFrame(records)
+        df['Harga_Jual'] = pd.to_numeric(df['Harga_Jual'], errors='coerce').fillna(0)
         return df
     except Exception as e:
         # Menampilkan pesan error jika gagal memuat data
